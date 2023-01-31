@@ -1,6 +1,6 @@
-#include <ros/ros.h>
+#include "rclcpp/rclcpp.hpp"
 
-#include <sensor_msgs/PointCloud2.h>
+#include "sensor_msgs/msg/point_cloud2.hpp"
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -31,23 +31,25 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (PointXYZIRT,
     (uint16_t, ring, ring) (float, time, time)
 )
 
-ros::Subscriber subPC;
-ros::Publisher pubPC;
+rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr subPC;
+rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubPC;
 
 template<typename T>
-void publish_points(T &new_pc, const sensor_msgs::PointCloud2 &old_msg) {
+void publish_points(T &new_pc, const sensor_msgs::msg::PointCloud2 &old_msg) {
     // pc properties
     new_pc->is_dense = true;
 
     // publish
-    sensor_msgs::PointCloud2 pc_new_msg;
+    sensor_msgs::msg::PointCloud2 pc_new_msg;
     pcl::toROSMsg(*new_pc, pc_new_msg);
     pc_new_msg.header = old_msg.header;
     pc_new_msg.header.frame_id = "velodyne";
-    pubPC.publish(pc_new_msg);
+    pubPC->publish(pc_new_msg);
 }
 
-void lidar_handle(sensor_msgs::PointCloud2 pc_msg) {
+void lidar_handle(const sensor_msgs::msg::PointCloud2::ConstSharedPtr pc_msg_pointer) {
+    sensor_msgs::msg::PointCloud2 pc_msg;
+    pc_msg = *pc_msg_pointer;
     pcl::PointCloud<pcl::PointXYZ>::Ptr pc(new pcl::PointCloud<pcl::PointXYZ>());
     pcl::PointCloud<PointXYZIRT>::Ptr pc_new(new pcl::PointCloud<PointXYZIRT>());
     pcl::fromROSMsg(pc_msg, *pc);
@@ -77,14 +79,15 @@ void lidar_handle(sensor_msgs::PointCloud2 pc_msg) {
 }
 
 int main(int argc, char **argv) {
-    ros::init(argc, argv, "rs_converter");
-    ros::NodeHandle nh;
+    // ros::init(argc, argv, "rs_converter");
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("converter");
 
-    subPC = nh.subscribe(lidar_topic, 1, lidar_handle);
-    
-    pubPC = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_points", 1);
+    subPC = node->create_subscription<sensor_msgs::msg::PointCloud2>(lidar_topic, 10, lidar_handle);
+    pubPC = node->create_publisher<sensor_msgs::msg::PointCloud2>("/velodyne_points", 10);
 
-    ROS_INFO("Listening to lidar topic ......");
-    ros::spin();
+    RCLCPP_INFO(node->get_logger(), "Listening to lidar topic ......");
+    rclcpp::spin(node);
+    rclcpp::shutdown();
     return 0;
 }
