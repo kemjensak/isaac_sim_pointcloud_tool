@@ -44,6 +44,7 @@ void publish_points(T &new_pc, const sensor_msgs::msg::PointCloud2 &old_msg) {
     pcl::toROSMsg(*new_pc, pc_new_msg);
     pc_new_msg.header = old_msg.header;
     pc_new_msg.header.frame_id = "velodyne";
+    pc_new_msg.header.stamp = old_msg.header.stamp;
     pubPC->publish(pc_new_msg);
 }
 
@@ -84,7 +85,7 @@ int main(int argc, char **argv) {
     auto node = rclcpp::Node::make_shared("converter");
 
     subPC = node->create_subscription<sensor_msgs::msg::PointCloud2>(lidar_topic, 10, lidar_handle);
-    pubPC = node->create_publisher<sensor_msgs::msg::PointCloud2>("/velodyne_points", 10);
+    pubPC = node->create_publisher<sensor_msgs::msg::PointCloud2>("/points_raw", 10);
 
     RCLCPP_INFO(node->get_logger(), "Listening to lidar topic ......");
     rclcpp::spin(node);
